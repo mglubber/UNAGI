@@ -5,44 +5,55 @@ Author: Jung Nicolas
 Description: A simple log system
 """
 
-#Native imports
-import os, time
+# Native imports
+import os
+import time
+
+
+def timestamp():
+	return time.strftime("%Y/%m/%d - %H:%M:%S")
+
 
 class logger:
-	logerror=False
-	silent=False
-	verbose=False
-	logfile=None
+	logerror = False
+	silent = False
+	verbose = False
+	logfile = None
 
 	def __init__(self, logfile=None):
-		self.logfile=logfile
-		if logfile is None: self.logfile = os.path.join(os.path.dirname(__file__),"log","main.log")
-
+		self.logfile = logfile
+		if logfile is None:
+			self.logfile = os.path.join(os.path.dirname(__file__), "log", "main.log")
 
 	def tell(self, string, logfile=None):
 		self.write(string, logfile, not self.silent)
 
 	def write(self, string, logfile=None, display=None):
-		if logfile is None: logfile=self.logfile
-		if display is None: display=self.verbose and not self.silent
+		message = f"[{timestamp()}] {string}"
+		if logfile is None:
+			logfile = self.logfile
+		if display is None:
+			display = self.verbose and not self.silent
 		if display:
-			print("[%s] %s"%(time.strftime("%Y/%m/%d - %H:%M:%S"), string))
+			print(message)
 		if not self.logerror:
 			try:
-				with open(logfile,"a")as log:
-					log.write("[%s] %s\n"%(time.strftime("%Y/%m/%d - %H:%M:%S"), string))
+				with open(logfile, "a") as log:
+					log.write(message)
 			except Exception:
-				print("Could not write to the log file (%s)."%(logfile))
-				self.logerror=True
+				print(f"Could not write to the log file {logfile}.")
+				self.logerror = True
 
 	def erase(self, logfile=None, display=None):
-		if logfile is None: logfile=self.logfile
-		if display is None: display=self.verbose
+		if logfile is None:
+			logfile = self.logfile
+		if display is None:
+			display = self.verbose
 		if display:
-			print("[%s] resetting the logfile %s"%(time.strftime("%Y/%m/%d - %H:%M:%S"), logfile))
+			print(f"[{timestamp()}] resetting the logfile {logfile}")
 		if not self.logerror:
-			try:
-				with open(logfile,"w") as log:
+			try: # TODO: just delete the file, we don't need it
+				with open(logfile, "w") as log:
 					log.write("")
 			except Exception:
-				print("Could not write to the log file (%s)."%(logfile))
+				print(f"Could not write to the log file {logfile}.")
