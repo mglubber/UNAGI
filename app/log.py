@@ -39,7 +39,7 @@ class logger:
 		if not self.logerror:
 			try:
 				with open(logfile, "a") as log:
-					log.write(message)
+					log.write(message + "\n")
 			except Exception:
 				print(f"Could not write to the log file {logfile}.")
 				self.logerror = True

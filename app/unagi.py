@@ -79,9 +79,9 @@ def main(argv):
         log.tell("The output directory %s doesn't exist, creating it")
         os.mkdir(outputPath)
 
-    transitionnalOutputPath = os.path.join(outputPath, "transitionnal")
-    if not os.path.isdir(transitionnalOutputPath):
-        os.mkdir(transitionnalOutputPath)
+    transitionalOutputPath = os.path.join(outputPath, "transitional")
+    if not os.path.isdir(transitionalOutputPath):
+        os.mkdir(transitionalOutputPath)
 
     # Genome
     genomeFile = args.genome
@@ -93,12 +93,12 @@ def main(argv):
     # If the -s option is selected, the stranded file is the input file. Otherwise, it has to be generated
     stranding = not args.stranded
     if stranding:
-        strandedFile = os.path.join(transitionnalOutputPath, config["stranded_file"])
+        strandedFile = os.path.join(transitionalOutputPath, config["stranded_file"])
     else:
         strandedRecords = inputRecords
         strandedFile = inputFile
 
-    # More output should happen if the script runson verbose mode
+    # More output should happen if the script runs in verbose mode
     log.verbose = args.verbose
     # No output should happen if the script runs silently
     log.silent = args.silent
@@ -114,7 +114,7 @@ def main(argv):
         log.tell("A total of %i records out of %i (%i%%) were successfully stranded" % (
         len(strandedRecords), len(inputRecords), round(len(strandedRecords) * 100 / len(inputRecords))))
 
-    # Cleaing memory of huge variables:
+    # Cleaning memory of huge variables:
     inputRecords = None
     del inputRecords
     strandedRecords = None
@@ -122,93 +122,93 @@ def main(argv):
 
     # Map the reads to the genome
     log.tell("Mapping the reads to the genome")
-    minimap(strandedFile, genomeFile, os.path.join(transitionnalOutputPath, config["raw_mapped_sam_file"]))
+    minimap(strandedFile, genomeFile, os.path.join(transitionalOutputPath, config["raw_mapped_sam_file"]))
 
     # Get a bam file from the results and sort it
     log.tell("Sorting the mapped reads")
-    samToBam(os.path.join(transitionnalOutputPath, config["raw_mapped_sam_file"]),
-             os.path.join(transitionnalOutputPath, config["raw_mapped_bam_file"]))
-    sortBam(os.path.join(transitionnalOutputPath, config["raw_mapped_bam_file"]),
-            os.path.join(transitionnalOutputPath, config["raw_sorted_bam_file"]))
+    samToBam(os.path.join(transitionalOutputPath, config["raw_mapped_sam_file"]),
+             os.path.join(transitionalOutputPath, config["raw_mapped_bam_file"]))
+    sortBam(os.path.join(transitionalOutputPath, config["raw_mapped_bam_file"]),
+            os.path.join(transitionalOutputPath, config["raw_sorted_bam_file"]))
 
     # Get the bed file from our first mapping and separating it between positive and negative reads
     log.tell("Generating the positive and negative bed files")
-    bamToBed(os.path.join(transitionnalOutputPath, config["raw_sorted_bam_file"]),
-             os.path.join(transitionnalOutputPath, config["raw_sorted_bed_file"]))
-    bamToBed(os.path.join(transitionnalOutputPath, config["raw_sorted_bam_file"]),
-             os.path.join(transitionnalOutputPath, config["raw_sorted_split_bed_file"]), split=True)
-    separateBedFile(os.path.join(transitionnalOutputPath, config["raw_sorted_bed_file"]),
-                    os.path.join(transitionnalOutputPath, config["positive_bed_file"]),
-                    os.path.join(transitionnalOutputPath, config["negative_bed_file"]))
+    bamToBed(os.path.join(transitionalOutputPath, config["raw_sorted_bam_file"]),
+             os.path.join(transitionalOutputPath, config["raw_sorted_bed_file"]))
+    bamToBed(os.path.join(transitionalOutputPath, config["raw_sorted_bam_file"]),
+             os.path.join(transitionalOutputPath, config["raw_sorted_split_bed_file"]), split=True)
+    separateBedFile(os.path.join(transitionalOutputPath, config["raw_sorted_bed_file"]),
+                    os.path.join(transitionalOutputPath, config["positive_bed_file"]),
+                    os.path.join(transitionalOutputPath, config["negative_bed_file"]))
 
     # Generate a fasta file from each bed file and the full genome
     log.tell("Generating fasta files from our bed files and the genome")
-    bedToFasta(os.path.join(transitionnalOutputPath, config["positive_bed_file"]), genomeFile,
-               os.path.join(transitionnalOutputPath, config["positive_refined_fasta_file"]))
-    bedToFasta(os.path.join(transitionnalOutputPath, config["negative_bed_file"]), genomeFile,
-               os.path.join(transitionnalOutputPath, config["negative_refined_fasta_file"]))
+    bedToFasta(os.path.join(transitionalOutputPath, config["positive_bed_file"]), genomeFile,
+               os.path.join(transitionalOutputPath, config["positive_refined_fasta_file"]))
+    bedToFasta(os.path.join(transitionalOutputPath, config["negative_bed_file"]), genomeFile,
+               os.path.join(transitionalOutputPath, config["negative_refined_fasta_file"]))
 
     # Map the newly created fasta file
     log.tell("Mapping the new fasta files to the genome")
-    minimap(os.path.join(transitionnalOutputPath, config["positive_refined_fasta_file"]), genomeFile,
-            os.path.join(transitionnalOutputPath, config["positive_mapped_sam_file"]))
-    minimap(os.path.join(transitionnalOutputPath, config["negative_refined_fasta_file"]), genomeFile,
-            os.path.join(transitionnalOutputPath, config["negative_mapped_sam_file"]))
+    minimap(os.path.join(transitionalOutputPath, config["positive_refined_fasta_file"]), genomeFile,
+            os.path.join(transitionalOutputPath, config["positive_mapped_sam_file"]))
+    minimap(os.path.join(transitionalOutputPath, config["negative_refined_fasta_file"]), genomeFile,
+            os.path.join(transitionalOutputPath, config["negative_mapped_sam_file"]))
 
     # Get a sorted bam file from our mapping
     log.tell("Sorting the new mapped reads")
-    samToBam(os.path.join(transitionnalOutputPath, config["positive_mapped_sam_file"]),
-             os.path.join(transitionnalOutputPath, config["positive_mapped_bam_file"]))
-    samToBam(os.path.join(transitionnalOutputPath, config["negative_mapped_sam_file"]),
-             os.path.join(transitionnalOutputPath, config["negative_mapped_bam_file"]))
-    sortBam(os.path.join(transitionnalOutputPath, config["positive_mapped_bam_file"]),
-            os.path.join(transitionnalOutputPath, config["positive_sorted_bam_file"]))
-    sortBam(os.path.join(transitionnalOutputPath, config["negative_mapped_bam_file"]),
-            os.path.join(transitionnalOutputPath, config["negative_sorted_bam_file"]))
+    samToBam(os.path.join(transitionalOutputPath, config["positive_mapped_sam_file"]),
+             os.path.join(transitionalOutputPath, config["positive_mapped_bam_file"]))
+    samToBam(os.path.join(transitionalOutputPath, config["negative_mapped_sam_file"]),
+             os.path.join(transitionalOutputPath, config["negative_mapped_bam_file"]))
+    sortBam(os.path.join(transitionalOutputPath, config["positive_mapped_bam_file"]),
+            os.path.join(transitionalOutputPath, config["positive_sorted_bam_file"]))
+    sortBam(os.path.join(transitionalOutputPath, config["negative_mapped_bam_file"]),
+            os.path.join(transitionalOutputPath, config["negative_sorted_bam_file"]))
 
     # Get the coverage for each position from our map results
     log.tell("Generating the genome coverage for each position")
-    genomecov(os.path.join(transitionnalOutputPath, config["positive_sorted_bam_file"]), genomeFile,
-              os.path.join(transitionnalOutputPath, config["positive_coverage_file"]))
-    genomecov(os.path.join(transitionnalOutputPath, config["negative_sorted_bam_file"]), genomeFile,
-              os.path.join(transitionnalOutputPath, config["negative_coverage_file"]))
-    combineCoverage(os.path.join(transitionnalOutputPath, config["positive_coverage_file"]),
-                    os.path.join(transitionnalOutputPath, config["negative_coverage_file"]),
-                    os.path.join(transitionnalOutputPath, config["total_coverage_file"]))
+    genomecov(os.path.join(transitionalOutputPath, config["positive_sorted_bam_file"]), genomeFile,
+              os.path.join(transitionalOutputPath, config["positive_coverage_file"]))
+    genomecov(os.path.join(transitionalOutputPath, config["negative_sorted_bam_file"]), genomeFile,
+              os.path.join(transitionalOutputPath, config["negative_coverage_file"]))
+    combineCoverage(os.path.join(transitionalOutputPath, config["positive_coverage_file"]),
+                    os.path.join(transitionalOutputPath, config["negative_coverage_file"]),
+                    os.path.join(transitionalOutputPath, config["total_coverage_file"]))
 
     # Determine genes start and end positions from the coverage, store the lists in variable for later use
     log.tell("Determining genes start and end positions from the coverage")
-    positiveChrList = findCoverageBreaks(os.path.join(transitionnalOutputPath, config["positive_coverage_file"]),
-                                         os.path.join(transitionnalOutputPath,
+    positiveChrList = findCoverageBreaks(os.path.join(transitionalOutputPath, config["positive_coverage_file"]),
+                                         os.path.join(transitionalOutputPath,
                                                       config["positive_genelist_incomplete_file"]), "+")
-    negativeChrList = findCoverageBreaks(os.path.join(transitionnalOutputPath, config["negative_coverage_file"]),
-                                         os.path.join(transitionnalOutputPath,
+    negativeChrList = findCoverageBreaks(os.path.join(transitionalOutputPath, config["negative_coverage_file"]),
+                                         os.path.join(transitionalOutputPath,
                                                       config["negative_genelist_incomplete_file"]), "-")
 
     # Determine genes end positions from 3' coverage
     log.tell("Determining genes end positions from 3' coverage")
-    genomecov3dash(os.path.join(transitionnalOutputPath, config["positive_sorted_bam_file"]),
-                   os.path.join(transitionnalOutputPath, config["positive_3dash_file"]))
-    genomecov3dash(os.path.join(transitionnalOutputPath, config["negative_sorted_bam_file"]),
-                   os.path.join(transitionnalOutputPath, config["negative_3dash_file"]))
+    genomecov3dash(os.path.join(transitionalOutputPath, config["positive_sorted_bam_file"]),
+                   os.path.join(transitionalOutputPath, config["positive_3dash_file"]))
+    genomecov3dash(os.path.join(transitionalOutputPath, config["negative_sorted_bam_file"]),
+                   os.path.join(transitionalOutputPath, config["negative_3dash_file"]))
 
     # Determine genes start positions from 5' coverage
     log.tell("Determining genes start positions from 5' coverage")
-    genomecov5dash(os.path.join(transitionnalOutputPath, config["positive_sorted_bam_file"]),
-                   os.path.join(transitionnalOutputPath, config["positive_5dash_file"]))
-    genomecov5dash(os.path.join(transitionnalOutputPath, config["negative_sorted_bam_file"]),
-                   os.path.join(transitionnalOutputPath, config["negative_5dash_file"]))
+    genomecov5dash(os.path.join(transitionalOutputPath, config["positive_sorted_bam_file"]),
+                   os.path.join(transitionalOutputPath, config["positive_5dash_file"]))
+    genomecov5dash(os.path.join(transitionalOutputPath, config["negative_sorted_bam_file"]),
+                   os.path.join(transitionalOutputPath, config["negative_5dash_file"]))
 
     # Intersect genes start and end positions from the coverage analysis and cuts to refine our analysis
     log.tell("Intersecting genes start and end positions from the coverage analysis and cuts")
-    positiveChrList = insertDashCuts(os.path.join(transitionnalOutputPath, config["positive_3dash_file"]),
-                                     os.path.join(transitionnalOutputPath, config["positive_5dash_file"]),
+    positiveChrList = insertDashCuts(os.path.join(transitionalOutputPath, config["positive_3dash_file"]),
+                                     os.path.join(transitionalOutputPath, config["positive_5dash_file"]),
                                      positiveChrList,
-                                     os.path.join(transitionnalOutputPath, config["positive_genelist_file"]), "+")
-    negativeChrList = insertDashCuts(os.path.join(transitionnalOutputPath, config["negative_3dash_file"]),
-                                     os.path.join(transitionnalOutputPath, config["negative_5dash_file"]),
+                                     os.path.join(transitionalOutputPath, config["positive_genelist_file"]), "+")
+    negativeChrList = insertDashCuts(os.path.join(transitionalOutputPath, config["negative_3dash_file"]),
+                                     os.path.join(transitionalOutputPath, config["negative_5dash_file"]),
                                      negativeChrList,
-                                     os.path.join(transitionnalOutputPath, config["negative_genelist_file"]), "-")
+                                     os.path.join(transitionalOutputPath, config["negative_genelist_file"]), "-")
 
     # Combining the results
     log.tell("Combining the results in a single file")
@@ -216,20 +216,20 @@ def main(argv):
 
     # Finding splicing isoforms
     log.tell("Finding splincing isoforms")
-    findSpliceSites(os.path.join(transitionnalOutputPath, config["raw_sorted_split_bed_file"]),
-                    os.path.join(transitionnalOutputPath, config["raw_splice_sites_file"]))
-    filterByCoverage(os.path.join(transitionnalOutputPath, config["raw_splice_sites_file"]),
-                     os.path.join(transitionnalOutputPath, config["total_coverage_file"]),
-                     os.path.join(transitionnalOutputPath, config["coverage_filtered_splice_sites_file"]))
-    filterByGenome(os.path.join(transitionnalOutputPath, config["coverage_filtered_splice_sites_file"]), genomeFile,
-                   os.path.join(transitionnalOutputPath, config["genome_filtered_splice_sites_file"]))
+    findSpliceSites(os.path.join(transitionalOutputPath, config["raw_sorted_split_bed_file"]),
+                    os.path.join(transitionalOutputPath, config["raw_splice_sites_file"]))
+    filterByCoverage(os.path.join(transitionalOutputPath, config["raw_splice_sites_file"]),
+                     os.path.join(transitionalOutputPath, config["total_coverage_file"]),
+                     os.path.join(transitionalOutputPath, config["coverage_filtered_splice_sites_file"]))
+    filterByGenome(os.path.join(transitionalOutputPath, config["coverage_filtered_splice_sites_file"]), genomeFile,
+                   os.path.join(transitionalOutputPath, config["genome_filtered_splice_sites_file"]))
     log.tell("Selecting the relevant isoforms")
-    findBestIsoform(os.path.join(transitionnalOutputPath, config["genome_filtered_splice_sites_file"]),
-                    os.path.join(transitionnalOutputPath, config["best_filtered_splice_sites_file"]))
+    findBestIsoform(os.path.join(transitionalOutputPath, config["genome_filtered_splice_sites_file"]),
+                    os.path.join(transitionalOutputPath, config["best_filtered_splice_sites_file"]))
     # Translating to bed format for the final results
-    convertIsoformstoBed(os.path.join(transitionnalOutputPath, config["genome_filtered_splice_sites_file"]),
+    convertIsoformstoBed(os.path.join(transitionalOutputPath, config["genome_filtered_splice_sites_file"]),
                          os.path.join(outputPath, config["final_splice_sites_file"]))
-    convertIsoformstoBed(os.path.join(transitionnalOutputPath, config["best_filtered_splice_sites_file"]),
+    convertIsoformstoBed(os.path.join(transitionalOutputPath, config["best_filtered_splice_sites_file"]),
                          os.path.join(outputPath, config["final_unique_splice_sites_file"]))
     # --> UTR Isoforms
 
@@ -273,7 +273,7 @@ def separateBedFile(sourceFile, positiveFile, negativeFile):
 
     global config
     global log
-    # counters to give a feedack on the number of entries in each file at the end
+    # counters to give a feedback on the number of entries in each file at the end
     pos = 0
     neg = 0
     # The sign is in 6th position so for each line, we write it into the postive or negative file accordingly
@@ -692,7 +692,7 @@ def findBestIsoform(sourceFile, outputFile):
             lastline = None
             isoforms = []
             for line in inFile:
-                # Seach for instances sharing approximately the same splice site
+                # Search for instances sharing approximately the same splice site
                 currentline = line.strip().split("\t")
                 if lastline is not None and (
                         abs(int(lastline[4]) - int(currentline[4])) < int(config["max_splice_difference"]) or abs(
@@ -700,9 +700,9 @@ def findBestIsoform(sourceFile, outputFile):
                     isoforms.append(currentline)
                 else:
                     # Once a new transcript is hit, write the best isoform of the list to the output file
-                    if lastline != None:
+                    if lastline is not None:
                         outFile.write("\t".join(getBest(isoforms)) + "\n")
-                    # Then reinitialize with the curent line
+                    # Then reinitialize with the current line
                     isoforms = [currentline]
                 lastline = currentline
 
@@ -714,7 +714,7 @@ def getBest(isoforms):
     """Returns the best isoform of a list"""
     best = None
     bestScore = 0
-    for isoform in (isoforms):
+    for isoform in isoforms:
         score = isoform[3]
         if best is None or score > bestScore:
             best = isoform
@@ -759,14 +759,14 @@ def combineCoverage(positiveCoverageFile, negativeCoverageFile, allCoverageFile)
     """Combines two coverage files for the same chromosomes and adds their coverage together"""
     with open(positiveCoverageFile, "r") as positive:
         with open(negativeCoverageFile, "r") as negative:
-            with open(allCoverageFile, "w") as all:
+            with open(allCoverageFile, "w") as all_coverage:
                 for posline in positive:
                     negline = next(negative)
                     posparts = posline.split("\t")
-                    negparts = posline.split("\t")
+                    negparts = negline.split("\t")
                     if posparts[0] == negparts[0] and posparts[1] == negparts[1]:
                         total = int(posparts[2]) + int(negparts[2])
-                        all.write("%s\t%s\t%i\n" % (posparts[0], posparts[1], total))
+                        all_coverage.write("%s\t%s\t%i\n" % (posparts[0], posparts[1], total))
 
 
 # Command line functions
