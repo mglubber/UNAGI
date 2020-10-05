@@ -286,7 +286,7 @@ def separateBedFile(sourceFile, positiveFile, negativeFile):
             elif len(parts) >= 6 and parts[5] == "-":
                 negative.write(line)
                 neg = neg + 1
-    log.write("Found %i positive entries and %i negative ones.")
+    log.write(f"Found {pos} positive entries and {neg} negative ones.")
 
 
 def findCoverageBreaks(sourceFile, outputFile, strand="."):
@@ -773,26 +773,32 @@ def combineCoverage(positiveCoverageFile, negativeCoverageFile, allCoverageFile)
 # These functions all call a tool through command line (subprocess) and wait for it to finish
 # Options for these commands are set i the config file (conf.ini)
 
+def generic_command_wrapper(command_string, command_name):
+
+    log.write(f"Running {command_name} with the following command: {command_string}")
+    process = subprocess.Popen(command_string, shell=True)
+    exit_status = process.wait()
+    if exit_status == 0:
+        log.write(f"Finished running {command_name}")
+    else:
+        log.write(f"Error running {command_name} with command: {command_string}")
+        log.write("Terminating")
+        sys.exit(1)
+
 
 def minimap(sourceFile, genomeFile, outputFile):
     global config
     global log
     command = config["minimap_path"] + " " + config[
         "minimap_options"] + " " + genomeFile + " " + sourceFile + " > " + outputFile
-    log.write("Running minimap with the following command: " + command)
-    process = subprocess.Popen(command, shell=True)
-    process.wait()
-    log.write("Finished running minimap")
+    generic_command_wrapper(command, "minimap")
 
 
 def samToBam(sourceFile, outputFile):
     global config
     global log
     command = config["samtools_path"] + " " + config["samtobam_options"] + " " + sourceFile + " > " + outputFile
-    log.write("Running samtools with the following command: " + command)
-    process = subprocess.Popen(command, shell=True)
-    process.wait()
-    log.write("Finished running samtools")
+    generic_command_wrapper(command, "samtools")
 
 
 def bamToBed(sourceFile, outputFile, split=False):
@@ -803,10 +809,7 @@ def bamToBed(sourceFile, outputFile, split=False):
             "bamtobed_split_options"] + " " + sourceFile + " > " + outputFile
     else:
         command = config["bedtools_path"] + " " + config["bamtobed_options"] + " " + sourceFile + " > " + outputFile
-    log.write("Running bedtools with the following command: " + command)
-    process = subprocess.Popen(command, shell=True)
-    process.wait()
-    log.write("Finished running bedtools")
+    generic_command_wrapper(command, "bamtools")
 
 
 def bedToFasta(sourceFile, genomeFile, outputFile):
@@ -814,10 +817,7 @@ def bedToFasta(sourceFile, genomeFile, outputFile):
     global log
     command = config["bedtools_path"] + " " + config[
         "getfasta_options"] + " -fi " + genomeFile + " -bed " + sourceFile + " -fo " + outputFile
-    log.write("Running bedtools with the following command: " + command)
-    process = subprocess.Popen(command, shell=True)
-    process.wait()
-    log.write("Finished running bedtools")
+    generic_command_wrapper(command, "bedtools")
 
 
 def sortBam(sourceFile, outputFile):
@@ -825,10 +825,7 @@ def sortBam(sourceFile, outputFile):
     global log
     command = config["samtools_path"] + " " + config[
         "sortbam_options"] + " " + sourceFile + " -o " + outputFile + " > " + outputFile
-    log.write("Running samtools with the following command: " + command)
-    process = subprocess.Popen(command, shell=True)
-    process.wait()
-    log.write("Finished running samtools")
+    generic_command_wrapper(command, "samtools")
 
 
 def genomecov(sourceFile, genomeFile, outputFile):
@@ -836,10 +833,7 @@ def genomecov(sourceFile, genomeFile, outputFile):
     global log
     command = config["bedtools_path"] + " " + config[
         "genomecov_options"] + " -ibam " + sourceFile + " -g " + genomeFile + " > " + outputFile
-    log.write("Running bedtools with the following command: " + command)
-    process = subprocess.Popen(command, shell=True)
-    process.wait()
-    log.write("Finished running bedtools")
+    generic_command_wrapper(command, "bedtools")
 
 
 def genomecov3dash(sourceFile, outputFile):
@@ -847,10 +841,7 @@ def genomecov3dash(sourceFile, outputFile):
     global log
     command = config["bedtools_path"] + " " + config[
         "genomecov3dash_options"] + " -ibam " + sourceFile + " > " + outputFile
-    log.write("Running bedtools with the following command: " + command)
-    process = subprocess.Popen(command, shell=True)
-    process.wait()
-    log.write("Finished running bedtools")
+    generic_command_wrapper(command, "bedtools")
 
 
 def genomecov5dash(sourceFile, outputFile):
@@ -858,10 +849,7 @@ def genomecov5dash(sourceFile, outputFile):
     global log
     command = config["bedtools_path"] + " " + config[
         "genomecov5dash_options"] + " -ibam " + sourceFile + " > " + outputFile
-    log.write("Running bedtools with the following command: " + command)
-    process = subprocess.Popen(command, shell=True)
-    process.wait()
-    log.write("Finished running bedtools")
+    generic_command_wrapper(command, "bedtools")
 
 
 if __name__ == "__main__":
