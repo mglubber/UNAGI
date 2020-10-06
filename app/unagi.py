@@ -53,27 +53,6 @@ def main(argv):
         sys.exit(1)
 
     # Arguments check
-    # Required
-    # Input
-    inputFile = args.input
-    if not os.path.isfile(inputFile):
-        log.tell("The input file %s doesn't exist" % (args.input))
-        sys.exit(1)
-    # Check the file format
-    try:
-        encoding = guess_type(inputFile)[1]  # uses file extension
-        _open = partial(gzip.open, mode='rt') if encoding == 'gzip' else open
-        log.tell("Reading the input file")
-        with _open(inputFile) as f:
-            inputRecords = list(SeqIO.parse(f, "fastq"))
-    except ValueError:
-        log.tell("The input file must be in the fastq format.")
-        return
-    if len(inputRecords) == 0:
-        log.tell("The input file must be in the fastq format.")
-        return
-
-    # Output
     outputPath = args.output
     if not os.path.isdir(outputPath):
         log.tell("The output directory %s doesn't exist, creating it")
@@ -86,40 +65,48 @@ def main(argv):
     # Genome
     genomeFile = args.genome
     if not os.path.isfile(genomeFile):
-        log.tell("The genome file %s doesn't exist" % (args.genome))
+        log.tell(f"The genome file {args.genome} does not exist")
         return
-
-    # Optional
-    # If the -s option is selected, the stranded file is the input file. Otherwise, it has to be generated
-    stranding = not args.stranded
-    if stranding:
-        strandedFile = os.path.join(transitionalOutputPath, config["stranded_file"])
-    else:
-        strandedRecords = inputRecords
-        strandedFile = inputFile
 
     # More output should happen if the script runs in verbose mode
     log.verbose = args.verbose
     # No output should happen if the script runs silently
     log.silent = args.silent
 
-    ## UNAGI Pipeline ##
+    # Input
+    inputFile = args.input
+    if not os.path.isfile(inputFile):
+        log.tell(f"The input file {args.input} doesn't exist")
+        sys.exit(1)
+    # Check the file format
+    try:
+        encoding = guess_type(inputFile)[1]  # uses file extension
+        _open = partial(gzip.open, mode='rt') if encoding == 'gzip' else open
+        log.tell("Reading the input file")
+        with _open(inputFile) as f:
+            # If the -s option is selected, the input file in stranded. Otherwise, it has to be generated.
+            stranding = not args.stranded
+            if stranding:
+                log.tell("Finding the different strands in the input reads")
+                # Find the strands if needed
+                inputRecords = SeqIO.parse(f, "fastq")
+                strandedFile = os.path.join(transitionalOutputPath, config["stranded_file"])
+                read_count = findStrands(inputRecords, strandedFile)
+            else:
+                # If -s is selected, we don't need to read in the whole file, since it just gets immediately passed off
+                # to minimap and isn't used. We'll check the first 20 records to make sure that the reads can be read
+                read_count = len([next(SeqIO.parse(f, "fastq")) for x in range(20)])
+                strandedFile = inputFile
+        if read_count == 0:
+            log.tell("The input file does not contain fastq reads")
+            sys.exit(1)
+    except ValueError as e:
+        print(e)
+        log.tell("The input file must be in the fastq format.")
+        sys.exit(1)
 
-    if (stranding):
-        log.tell("Finding the different strands in the input reads")
-        # Find the strands if needed
-        strandedRecords = findStrands(inputRecords)
-        # Writing the stranded reads to a fastq file
-        SeqIO.write(strandedRecords, strandedFile, "fastq")
-        log.tell("A total of %i records out of %i (%i%%) were successfully stranded" % (
-        len(strandedRecords), len(inputRecords), round(len(strandedRecords) * 100 / len(inputRecords))))
-
-    # Cleaning memory of huge variables:
-    inputRecords = None
+    # Cleaning memory of small variables:
     del inputRecords
-    strandedRecords = None
-    del strandedRecords
-
     # Map the reads to the genome
     log.tell("Mapping the reads to the genome")
     minimap(strandedFile, genomeFile, os.path.join(transitionalOutputPath, config["raw_mapped_sam_file"]))
@@ -178,10 +165,10 @@ def main(argv):
 
     # Determine genes start and end positions from the coverage, store the lists in variable for later use
     log.tell("Determining genes start and end positions from the coverage")
-    positiveChrList = findCoverageBreaks(os.path.join(transitionalOutputPath, config["positive_coverage_file"]),
+    test_positiveChrList = findCoverageBreaks(os.path.join(transitionalOutputPath, config["positive_coverage_file"]),
                                          os.path.join(transitionalOutputPath,
                                                       config["positive_genelist_incomplete_file"]), "+")
-    negativeChrList = findCoverageBreaks(os.path.join(transitionalOutputPath, config["negative_coverage_file"]),
+    test_negativeChrList = findCoverageBreaks(os.path.join(transitionalOutputPath, config["negative_coverage_file"]),
                                          os.path.join(transitionalOutputPath,
                                                       config["negative_genelist_incomplete_file"]), "-")
 
@@ -203,11 +190,11 @@ def main(argv):
     log.tell("Intersecting genes start and end positions from the coverage analysis and cuts")
     positiveChrList = insertDashCuts(os.path.join(transitionalOutputPath, config["positive_3dash_file"]),
                                      os.path.join(transitionalOutputPath, config["positive_5dash_file"]),
-                                     positiveChrList,
+                                     test_positiveChrList,
                                      os.path.join(transitionalOutputPath, config["positive_genelist_file"]), "+")
     negativeChrList = insertDashCuts(os.path.join(transitionalOutputPath, config["negative_3dash_file"]),
                                      os.path.join(transitionalOutputPath, config["negative_5dash_file"]),
-                                     negativeChrList,
+                                     test_negativeChrList,
                                      os.path.join(transitionalOutputPath, config["negative_genelist_file"]), "-")
 
     # Combining the results
@@ -215,7 +202,7 @@ def main(argv):
     combineChrLists(positiveChrList, negativeChrList, os.path.join(outputPath, config["full_genelist_file"]))
 
     # Finding splicing isoforms
-    log.tell("Finding splincing isoforms")
+    log.tell("Finding splicing isoforms")
     findSpliceSites(os.path.join(transitionalOutputPath, config["raw_sorted_split_bed_file"]),
                     os.path.join(transitionalOutputPath, config["raw_splice_sites_file"]))
     filterByCoverage(os.path.join(transitionalOutputPath, config["raw_splice_sites_file"]),
@@ -237,46 +224,51 @@ def main(argv):
     log.tell("The full gene list has been generated at: %s" % (os.path.join(outputPath, config["full_genelist_file"])))
 
 
-def findStrands(records):
-    """Find he forwards and backwards strands from a set of unstranded records"""
+def findStrands(records, output_file):
+    """Find the forwards and backwards strands from a set of unstranded records"""
     global config
     global log
 
     # Find the forwards reads
-    log.write("Finding the forwards reads.")
-    forwards = []
-    for record in records:
-        if config["strand_forwards_identifier"] in record.seq[
-                                                   int(config["strand_start_index"]):int(config["strand_end_index"])]:
-            forwards.append(record)
-    log.write("%i forwards reads found" % (len(forwards)))
+    strand_start_index = int(config["strand_start_index"])
+    strand_end_index = int(config["strand_end_index"])
+    forward_strand_seq = config["strand_forwards_identifier"]
+    backward_strand_seq = config["strand_backwards_identifier"]
 
-    # Find the backwards reads
-    log.write("Finding the backwards reads.")
-    backwards = []
-    for record in records:
-        if config["strand_backwards_identifier"] in record.seq[
-                                                    int(config["strand_start_index"]):int(config["strand_end_index"])]:
-            backwards.append(record)
-    log.write("%i backwards reads found" % (len(backwards)))
+    read_count, forward_count, backward_count = 0, 0, 0
+    # loop through all records and check if they contain the forward or reverse sequence at the proper index
+    # We can just write the reads to a file whenever we find them
+    with open(output_file, "w") as out_f:
+        for record in records:
+            index_sequence = record.seq[strand_start_index:strand_end_index]
+            read_count += 1
+            if forward_strand_seq in index_sequence:
+                forward_count += 1
+            elif backward_strand_seq in index_sequence:
+                # We can just get the reverse_complement now
+                record.seq = record.seq.reverse_complement()
+                backward_count += 1
+            else:  # Skip reads without a match
+                continue
+            # Write the newly-stranded read to a file
+            SeqIO.write(record, out_f, "fastq")
 
-    # Getting the reverse complement for the backwards reads
-    log.write("Getting the reverse complement for the backwards reads.")
-    for record in backwards:
-        record.seq = record.seq.reverse_complement()
-
-    return forwards + backwards
+    log.write(f"{forward_count} forwards reads found")
+    log.write(f"{backward_count} backwards reads found")
+    log.tell(f"A total of {forward_count + backward_count} records out of {read_count}"
+             f" ({round((forward_count + backward_count) * 100 / read_count):.1f}%) were successfully stranded")
+    return backward_count + forward_count
 
 
 def separateBedFile(sourceFile, positiveFile, negativeFile):
-    """Sorts the entries in a bed file into postive an negative ones"""
+    """Sorts the entries in a bed file into positive an negative ones"""
 
     global config
     global log
     # counters to give a feedback on the number of entries in each file at the end
     pos = 0
     neg = 0
-    # The sign is in 6th position so for each line, we write it into the postive or negative file accordingly
+    # The sign is in 6th position so for each line, we write it into the positive or negative file accordingly
     with open(positiveFile, "w") as positive, open(negativeFile, "w") as negative, open(sourceFile, "r") as source:
         for line in source:
             parts = line.strip().split()
@@ -306,7 +298,8 @@ def findCoverageBreaks(sourceFile, outputFile, strand="."):
             chr, pos, cov = line.strip().split("\t")
             # If we reach a new chromosome, we save the current genes positions in an array and begin a new one
             if chr != currentChr:
-                if currentChr is not None: chromosomes[currentChr] = list(currentGenes)
+                if currentChr is not None:
+                    chromosomes[currentChr] = list(currentGenes)
                 currentChr = chr
                 currentGenes = list()
                 currentGene = {"start": None, "end": None, "strand": strand}
@@ -324,7 +317,8 @@ def findCoverageBreaks(sourceFile, outputFile, strand="."):
                     geneNumber = geneNumber + 1
 
     # Add the last chromsome list
-    if currentChr is not None: chromosomes[currentChr] = list(currentGenes)
+    if currentChr is not None:
+        chromosomes[currentChr] = list(currentGenes)
 
     # Write the output as a bed file for later use
     with open(outputFile, "w") as bedGenes:
@@ -338,7 +332,7 @@ def findCoverageBreaks(sourceFile, outputFile, strand="."):
 
 def insertDashCuts(sourceFile3, sourceFile5, chromosomeList, outputFile, strand="."):
     """
-    Mixes a list of 3' or 5' results into a list of chromosomes start and end sites as  created by findCoverageBreaks
+    Mixes a list of 3' or 5' results into a list of chromosomes start and end sites as created by findCoverageBreaks
     """
 
     for dash in ["3", "5"]:
@@ -361,7 +355,7 @@ def insertDashCuts(sourceFile3, sourceFile5, chromosomeList, outputFile, strand=
                 if currentDashSite["chr"] != currentChr:
                     # if so, store the list of sites for the previous chromosome, then empty the list and reset the variables
                     if currentChr is not None:
-                        currentChrList.append(clusterMean(currentCluster))
+                        currentChrList += clusterMean(currentCluster)
                         dashSiteList[currentChr] = list(currentChrList)
                     currentCluster = list()
                     currentChr = currentDashSite["chr"]
@@ -377,7 +371,7 @@ def insertDashCuts(sourceFile3, sourceFile5, chromosomeList, outputFile, strand=
                     # If the peak is far enough from the last cluster, register the mean position for the peak and reset the cluster with our new result
                     else:
                         # The mean position is stored in the current chromosome list
-                        currentChrList.append(clusterMean(currentCluster))
+                        currentChrList += clusterMean(currentCluster)
                         currentCluster = list()
                         currentCluster.append(dict(currentDashSite))
                     # Once the site has been saved, keep it to compare it to the next
@@ -385,9 +379,9 @@ def insertDashCuts(sourceFile3, sourceFile5, chromosomeList, outputFile, strand=
 
         # Add the last chromosome list
         if currentChr is not None:
-            currentChrList.append(clusterMean(currentCluster))
+            currentChrList += clusterMean(currentCluster)
             dashSiteList[currentChr] = list(currentChrList)
-        # The dashSiteList now contains every cut site given by our 3' or 5' file, organized by chomosome name
+        # The dashSiteList now contains every cut site given by our 3' or 5' file, organized by chromosome name
 
         # Copy the dash site list to the correct variable
         if dash == "3":
@@ -442,12 +436,14 @@ def clusterMean(cluster):
 
     totalSites = 0
     totalPosition = 0
-    # The mean is calculated proportionnaly to the number of sites or each position
+    # The mean is calculated proportionally to the number of sites or each position
     for site in cluster:
         totalSites = totalSites + int(site["coverage"])
         totalPosition = totalPosition + (int(site["position"]) * int(site["coverage"]))
-
-    return int(round(totalPosition / totalSites))
+    try:
+        return [int(round(totalPosition / totalSites))]
+    except ZeroDivisionError:
+        return []
 
 
 def combineChrLists(chrList1, chrList2, outputFile):
@@ -601,14 +597,15 @@ def filterByCoverage(rawIsoformFile, coverageFile, filteredIsoformFile):
             coverageMap[chr].append(int(value))
 
     # Check the coverage at every splice position
-    with open(rawIsoformFile, 'r') as rawIsomophs:
+    with open(rawIsoformFile, 'r') as rawIsomorphs:
         with open(filteredIsoformFile, 'w') as filteredIsoforms:
-            for line in rawIsomophs:
+            for line in rawIsomorphs:
                 parts = line.strip().split("\t")
                 chr = parts[0]
                 readCount = int(parts[3])
                 spliceSites = parts[4:]
                 valid = False
+                # TODO: check this, I think it might be broken, or we can check once and break
                 for spliceSite in spliceSites:
                     valid = valid or coverageMap[chr][int(spliceSite)] / readCount < int(
                         config["max_coverage_to_splice_ratio"])
@@ -628,10 +625,10 @@ def filterByGenome(rawIsoformFile, genomeFile, filteredIsoformFile):
         for line in genome:
             if line[0] == ">":
                 parts = line.strip().split(" ")
-                chr = parts[0][1:]
-                if chr != currentChr:
-                    genomeMap[chr] = ""
-                currentChr = chr
+                chromosome = parts[0][1:]
+                if chromosome != currentChr:
+                    genomeMap[chromosome] = ""
+                currentChr = chromosome
             else:
                 genomeMap[currentChr] += line.strip().upper()
 
@@ -640,7 +637,7 @@ def filterByGenome(rawIsoformFile, genomeFile, filteredIsoformFile):
         with open(filteredIsoformFile, 'w') as filteredIsoforms:
             for line in rawIsomophs:
                 parts = line.strip().split("\t")
-                chr = parts[0]
+                chromosome = parts[0]
                 start = parts[1]
                 end = parts[2]
                 readCount = parts[3]
@@ -662,7 +659,7 @@ def filterByGenome(rawIsoformFile, genomeFile, filteredIsoformFile):
                 spliceSites = []
                 start = None
                 for exon in exons:
-                    sequence = genomeMap[chr][int(exon[0]):int(exon[1])]
+                    sequence = genomeMap[chromosome][int(exon[0]):int(exon[1])]
                     polyA = "A" * int(config["max_polyA_length"])
                     polyT = "T" * int(config["max_polyA_length"])
                     if len(sequence) < int(config["min_exon_length"]) and (
@@ -678,7 +675,7 @@ def filterByGenome(rawIsoformFile, genomeFile, filteredIsoformFile):
                         spliceSites.append(exon[1])
                 if len(spliceSites) > 2:
                     end = spliceSites.pop()
-                    filteredIsoforms.write("\t".join((chr, start, end, readCount, "\t".join(spliceSites))) + "\n")
+                    filteredIsoforms.write("\t".join((chromosome, start, end, readCount, "\t".join(spliceSites))) + "\n")
 
 
 def findBestIsoform(sourceFile, outputFile):
@@ -728,7 +725,7 @@ def convertIsoformstoBed(sourceFile, outputFile):
         with open(outputFile, "w") as outFile:
             for line in inFile:
                 parts = line.strip().split("\t")
-                chr = parts[0]
+                chromosome = parts[0]
                 start = parts[1]
                 end = parts[2]
                 readCount = parts[3]
@@ -745,14 +742,14 @@ def convertIsoformstoBed(sourceFile, outputFile):
                         exon = None
                 exon[1] = int(end)
                 exons.append(exon)
-                # Create the blocksizes and blockstarts fields from the exons
+                # Create the block sizes and block starts fields from the exons
                 blockSizes = ""
                 blockStarts = ""
                 for exon in exons:
-                    blockSizes += "%i," % (exon[1] - exon[0])
-                    blockStarts += "%i," % (exon[0] - int(start))
-                outFile.write("%s\t%s\t%s\t\t500\t.\t%s\t%s\t0\t%s\t%s\t%s\n" % (
-                chr, start, end, start, end, len(exons), blockSizes, blockStarts))
+                    blockSizes += str(exon[1] - exon[0])
+                    blockStarts += str(exon[0] - int(start))
+                bed_row = [chromosome, start, end, "", 500, ".", start, end, 0, len(exons), blockSizes, blockStarts]
+                outFile.write("\t".join(map(str, bed_row)) + "\n")
 
 
 def combineCoverage(positiveCoverageFile, negativeCoverageFile, allCoverageFile):
