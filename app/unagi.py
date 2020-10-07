@@ -297,7 +297,7 @@ def insertDashCuts(sourceFile3, sourceFile5, chromosomeList, outputFile, strand=
 				if currentDashSite["chr"] != currentChr:
 					#if so, store the list of sites for the previous chromosome, then empty the list and reset the variables
 					if currentChr is not None:
-						currentChrList.append(clusterMean(currentCluster))
+						currentChrList += clusterMean(currentCluster)
 						dashSiteList[currentChr]=list(currentChrList)
 					currentCluster=list()
 					currentChr=currentDashSite["chr"]
@@ -312,7 +312,7 @@ def insertDashCuts(sourceFile3, sourceFile5, chromosomeList, outputFile, strand=
 					#If the peak is far enough from the last cluster, register the mean position for the peak and reset the cluster with our new result
 					else:
 						#The mean position is stored in the current chromosome list
-						currentChrList.append(clusterMean(currentCluster))
+						currentChrList += clusterMean(currentCluster)
 						currentCluster=list()
 						currentCluster.append(dict(currentDashSite))
 					#Once the site has been saved, keep it to compare it to the next
@@ -320,7 +320,7 @@ def insertDashCuts(sourceFile3, sourceFile5, chromosomeList, outputFile, strand=
 
 		#Add the last chromosome list
 		if currentChr is not None:
-			currentChrList.append(clusterMean(currentCluster))
+			currentChrList += clusterMean(currentCluster)
 			dashSiteList[currentChr]=list(currentChrList)
 		#The dashSiteList now contains every cut site given by our 3' or 5' file, organized by chomosome name
 
@@ -379,8 +379,10 @@ def clusterMean(cluster):
 	for site in cluster:
 		totalSites = totalSites+int(site["coverage"])
 		totalPosition = totalPosition+(int(site["position"])*int(site["coverage"]))
-
-	return int(round(totalPosition/totalSites))
+	try:
+		return [int(round(totalPosition/totalSites))]
+	except ZeroDivisionError:
+		return []
 
 #Combines two chromosomes list together respecting the ordering
 def combineChrLists(chrList1, chrList2, outputFile):
@@ -679,7 +681,7 @@ def combineCoverage(positiveCoverageFile,negativeCoverageFile,allCoverageFile):
 				for posline in positive:
 					negline=next(negative)
 					posparts=posline.split("\t")
-					negparts=posline.split("\t")
+					negparts=negline.split("\t")
 					if posparts[0] == negparts[0] and posparts[1] == negparts[1]:
 						total=int(posparts[2])+int(negparts[2])
 						all.write("%s\t%s\t%i\n"%(posparts[0],posparts[1],total))
